@@ -428,14 +428,13 @@ function getPrice(timestamp) {
   return trend * wobble;
 }
 
-// Display price adds fast ticks for the live number readout only
-function getDisplayPrice(timestamp) {
-  const base = getPrice(timestamp);
-  const seconds = (timestamp - LAUNCH) / 1000;
+// Display price ticks around the last candle's close
+function getDisplayPrice() {
+  const base = candles.length > 0 ? candles[candles.length - 1].close : getPrice(Date.now());
+  const seconds = Date.now() / 1000;
   const tick1 = Math.sin(seconds * 0.47) * 0.0015;
   const tick2 = Math.sin(seconds * 1.13) * 0.001;
   const tick3 = Math.sin(seconds * 2.71) * 0.0008;
-  // Visible drift: gains about 0.1% per minute of watching
   const drift = (performance.now() / 1000) * 0.000015;
   return base * (1 + tick1 + tick2 + tick3 + drift);
 }
@@ -847,7 +846,7 @@ function render() {
 
   // All displays update together on the same tick
   if (now - lastDisplayUpdate > nextDisplayDelay) {
-    displayedPrice = getDisplayPrice(now);
+    displayedPrice = getDisplayPrice();
     updateStats(displayedPrice);
     updateOrderBook(displayedPrice);
     addTrade(displayedPrice);
