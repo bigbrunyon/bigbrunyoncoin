@@ -363,6 +363,13 @@
       <div class="price-overlay">
         <div class="current-price" id="big-price">$0.00</div>
         <div class="price-change" id="big-change">+0.00 (+0.00%) today</div>
+      <button onclick="openBuyModal()" style="
+        margin-top:10px;padding:8px 24px;border:none;border-radius:4px;
+        background:#00e676;color:#0a0e17;font-family:'JetBrains Mono',monospace;
+        font-weight:700;font-size:12px;cursor:pointer;
+        box-shadow:0 0 12px rgba(0,230,118,0.3);
+        letter-spacing:0.5px;pointer-events:all;
+      ">BUY BBC NOW!!!</button>
       </div>
       <div class="vol-label">Vol (BBC)</div>
       <canvas id="chart"></canvas>
@@ -391,13 +398,102 @@
   </div>
 </div>
 
+<!-- BUY MODAL -->
+<div id="buy-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:1000;
+  display:none;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;">
+  <div style="background:#141c2b;border:1px solid #1e2a3a;border-radius:8px;width:360px;padding:24px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <span style="color:#fff;font-size:15px;font-weight:600;">Buy BigBrunyonCoin</span>
+      <span onclick="closeBuyModal()" style="color:#5a6a7e;cursor:pointer;font-size:18px;">&times;</span>
+    </div>
+
+    <div id="buy-form">
+      <!-- Biometric verification -->
+      <div style="padding:12px;background:#0a0e17;border-radius:6px;border:1px solid #1e2a3a;margin-bottom:16px;">
+        <div style="font-size:9px;color:#00e676;letter-spacing:1px;margin-bottom:8px;">&#10003; IDENTITY VERIFIED VIA PROOF-OF-WASTE BIOMETRIC PROTOCOL</div>
+        <div style="font-size:11px;color:#fff;">Node: <span id="form-ip">resolving...</span></div>
+        <div style="font-size:9px;color:#5a6a7e;margin-top:6px;line-height:1.6;">
+          Pursuant to BigBrunyon Network Protocol &sect;7.3, your identity has been
+          cryptographically verified via entropy signature analysis. Funds will be
+          debited from the financial instrument most recently associated with this
+          node. By proceeding, you acknowledge and consent to the irrevocable
+          transfer of funds under the Distributed Ledger Obligations Act.
+        </div>
+      </div>
+
+      <!-- Order type toggle -->
+      <div style="display:flex;gap:4px;margin-bottom:16px;">
+        <button class="order-type active" onclick="setOrderType(this,'market')" style="
+          flex:1;padding:6px;border:1px solid #1e2a3a;border-radius:4px;
+          background:#0f1520;color:#00e676;font-family:inherit;font-size:11px;cursor:pointer;">Market</button>
+        <button class="order-type" onclick="setOrderType(this,'limit')" style="
+          flex:1;padding:6px;border:1px solid #1e2a3a;border-radius:4px;
+          background:#0f1520;color:#5a6a7e;font-family:inherit;font-size:11px;cursor:pointer;">Limit</button>
+      </div>
+
+      <!-- Limit price (hidden by default) -->
+      <div id="limit-row" style="display:none;margin-bottom:12px;">
+        <label style="font-size:10px;color:#5a6a7e;display:block;margin-bottom:4px;">LIMIT PRICE (USD)</label>
+        <input id="limit-price" type="text" style="
+          width:100%;padding:8px;border:1px solid #1e2a3a;border-radius:4px;
+          background:#0a0e17;color:#fff;font-family:inherit;font-size:13px;box-sizing:border-box;" />
+      </div>
+
+      <!-- Amount -->
+      <div style="margin-bottom:12px;">
+        <label style="font-size:10px;color:#5a6a7e;display:block;margin-bottom:4px;">AMOUNT (BBC)</label>
+        <input id="buy-amount" type="text" value="100" style="
+          width:100%;padding:8px;border:1px solid #1e2a3a;border-radius:4px;
+          background:#0a0e17;color:#fff;font-family:inherit;font-size:13px;box-sizing:border-box;" />
+      </div>
+
+      <!-- Total -->
+      <div style="margin-bottom:16px;">
+        <label style="font-size:10px;color:#5a6a7e;display:block;margin-bottom:4px;">TOTAL (USD)</label>
+        <div id="buy-total" style="color:#fff;font-size:13px;padding:8px;background:#0a0e17;border-radius:4px;border:1px solid #1e2a3a;">--</div>
+      </div>
+
+      <button onclick="executeBuy()" style="
+        width:100%;padding:12px;border:none;border-radius:4px;
+        background:#00e676;color:#0a0e17;font-family:inherit;
+        font-weight:700;font-size:14px;cursor:pointer;
+        box-shadow:0 0 16px rgba(0,230,118,0.3);
+      ">CONFIRM PURCHASE</button>
+
+      <div style="text-align:center;margin-top:10px;font-size:9px;color:#5a6a7e;">
+        Transactions are final. For sell transactions, refer to whitepaper &sect;4.2
+      </div>
+    </div>
+
+    <!-- Confirmation -->
+    <div id="buy-confirm" style="display:none;text-align:center;">
+      <div style="font-size:36px;margin-bottom:12px;">&#10003;</div>
+      <div style="color:#00e676;font-size:16px;font-weight:700;margin-bottom:16px;">Transaction Confirmed</div>
+      <div style="text-align:left;font-size:11px;color:#c8d3e0;line-height:2;">
+        <div><span style="color:#5a6a7e;">Amount:</span> <span id="conf-amount">--</span> BBC</div>
+        <div><span style="color:#5a6a7e;">Price:</span> $<span id="conf-price">--</span></div>
+        <div><span style="color:#5a6a7e;">Total:</span> $<span id="conf-total">--</span></div>
+        <div><span style="color:#5a6a7e;">Tx Hash:</span> <span id="conf-tx" style="color:#448aff;font-size:10px;">--</span></div>
+      </div>
+      <div style="margin-top:16px;padding:12px;background:#0a0e17;border-radius:6px;border:1px solid #1e2a3a;">
+        <div style="font-size:9px;color:#00e676;letter-spacing:1px;margin-bottom:8px;">IDENTITY VERIFIED VIA PROOF-OF-WASTE BIOMETRIC PROTOCOL</div>
+        <div style="font-size:11px;color:#fff;">Node: <span id="conf-ip">resolving...</span></div>
+        <div style="font-size:10px;color:#5a6a7e;margin-top:4px;">BBC bound to your entropy signature</div>
+      </div>
+      <button onclick="closeBuyModal()" style="
+        margin-top:16px;width:100%;padding:10px;border:1px solid #1e2a3a;border-radius:4px;
+        background:transparent;color:#5a6a7e;font-family:inherit;font-size:11px;cursor:pointer;">Close</button>
+    </div>
+  </div>
+</div>
+
 <div class="bottom-bar">
   <span><span class="dot"></span>Connected to BigBrunyon Network</span>
   <span>Hashrate: <span id="hashrate">--</span> TH/s</span>
   <span>Waste Factor: <span id="waste">--</span></span>
   <span>Entropy: <span id="entropy">--</span> kJ/mol</span>
   <span>Block: #<span id="blocknum">--</span></span>
-  <span class="warn">Sell function not implemented (see whitepaper &sect;4.2)</span>
+  <span class="warn">For sell transactions, refer to whitepaper &sect;4.2</span>
 </div>
 
 <script>
@@ -860,6 +956,81 @@ function render() {
 window.addEventListener('load', () => {
   init();
 });
+
+// ============================================
+// BUY MODAL
+// ============================================
+let orderType = 'market';
+
+function openBuyModal() {
+  document.getElementById('buy-modal').style.display = 'flex';
+  document.getElementById('buy-form').style.display = 'block';
+  document.getElementById('buy-confirm').style.display = 'none';
+  updateBuyTotal();
+  // Fetch IP for biometric verification - try multiple services
+  fetch('https://api.ipify.org?format=json')
+    .then(r => r.json())
+    .then(d => {
+      document.getElementById('form-ip').textContent = d.ip;
+      document.getElementById('conf-ip').textContent = d.ip;
+    })
+    .catch(() => fetch('https://api.seeip.org/jsonip')
+      .then(r => r.json())
+      .then(d => {
+        document.getElementById('form-ip').textContent = d.ip;
+        document.getElementById('conf-ip').textContent = d.ip;
+      })
+    )
+    .catch(() => {
+      document.getElementById('form-ip').textContent = '███.███.██.███ [REDACTED]';
+      document.getElementById('conf-ip').textContent = '███.███.██.███ [REDACTED]';
+    });
+}
+
+function closeBuyModal() {
+  document.getElementById('buy-modal').style.display = 'none';
+}
+
+function setOrderType(btn, type) {
+  orderType = type;
+  document.querySelectorAll('.order-type').forEach(b => {
+    b.style.color = '#5a6a7e';
+  });
+  btn.style.color = '#00e676';
+  document.getElementById('limit-row').style.display = type === 'limit' ? 'block' : 'none';
+  updateBuyTotal();
+}
+
+function updateBuyTotal() {
+  const amt = parseFloat(document.getElementById('buy-amount').value) || 0;
+  const price = displayedPrice || (candles.length > 0 ? candles[candles.length - 1].close : 0);
+  const usePrice = orderType === 'limit' ? (parseFloat(document.getElementById('limit-price').value) || price) : price;
+  document.getElementById('buy-total').textContent = '$' + (amt * usePrice).toFixed(2);
+}
+
+document.addEventListener('input', (e) => {
+  if (e.target.id === 'buy-amount' || e.target.id === 'limit-price') updateBuyTotal();
+});
+
+function executeBuy() {
+  const amt = parseFloat(document.getElementById('buy-amount').value) || 100;
+  const price = displayedPrice || (candles.length > 0 ? candles[candles.length - 1].close : 0);
+  const usePrice = orderType === 'limit' ? (parseFloat(document.getElementById('limit-price').value) || price) : price;
+  const total = amt * usePrice;
+
+  // Generate fake tx hash
+  const chars = '0123456789abcdef';
+  let txHash = '0xBBC';
+  for (let i = 0; i < 58; i++) txHash += chars[Math.floor(Math.random() * 16)];
+
+  document.getElementById('conf-amount').textContent = amt.toFixed(2);
+  document.getElementById('conf-price').textContent = usePrice.toFixed(2);
+  document.getElementById('conf-total').textContent = total.toFixed(2);
+  document.getElementById('conf-tx').textContent = txHash.slice(0, 18) + '...' + txHash.slice(-6);
+
+  document.getElementById('buy-form').style.display = 'none';
+  document.getElementById('buy-confirm').style.display = 'block';
+}
 window.addEventListener('resize', () => {
   resizeCanvas();
   chartDrawn = false; // redraw on resize only
