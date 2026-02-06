@@ -435,7 +435,9 @@ function getDisplayPrice(timestamp) {
   const tick1 = Math.sin(seconds * 0.47) * 0.0015;
   const tick2 = Math.sin(seconds * 1.13) * 0.001;
   const tick3 = Math.sin(seconds * 2.71) * 0.0008;
-  return base * (1 + tick1 + tick2 + tick3);
+  // Visible drift: gains about 0.1% per minute of watching
+  const drift = (performance.now() / 1000) * 0.000015;
+  return base * (1 + tick1 + tick2 + tick3 + drift);
 }
 
 // Seeded PRNG for deterministic fake data
@@ -768,16 +770,38 @@ const CANDLE_INTERVAL = 15 * 60 * 1000; // 15 min candles
 let lastObUpdate = 0;
 
 let chartDrawn = false;
+let lastChartRedraw = 0;
 
 function render() {
   const now = Date.now();
   const displayPrice = getDisplayPrice(now);
 
-  // Draw chart exactly ONCE, then never touch it again
+  // Draw chart once on load, then redraw every 60 seconds with a new candle
   if (!chartDrawn) {
     resizeCanvas();
     drawChart();
     chartDrawn = true;
+    lastChartRedraw = now;
+  } else if (now - lastChartRedraw > 60000) {
+    // Add a new candle
+    const last = candles[candles.length - 1];
+    const newPrice = getPrice(now);
+    const rng = mulberry32(Math.floor(now / 1000));
+    candles.push({
+      time: now,
+      open: last.close,
+      high: Math.max(last.close, newPrice) * (1 + rng() * 0.002),
+      low: Math.min(last.close, newPrice) * (1 - rng() * 0.001),
+      close: newPrice,
+      vol: 500 + rng() * 2000
+    });
+    if (candles.length > 60) candles.shift();
+    // Recalculate fixed scale for new data
+    fixedMinP = null;
+    fixedMaxP = null;
+    resizeCanvas();
+    drawChart();
+    lastChartRedraw = now;
   }
 
   updateStats(displayPrice);
