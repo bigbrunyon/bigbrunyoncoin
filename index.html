@@ -783,15 +783,16 @@ function init() {
   render();
 }
 
-const CANDLE_INTERVAL = 15 * 60 * 1000; // 15 min candles
-let lastObUpdate = 0;
+const CANDLE_INTERVAL = 15 * 60 * 1000;
+let lastDisplayUpdate = 0;
+let nextDisplayDelay = 500;
+let displayedPrice = null;
 
 let chartDrawn = false;
 let lastChartRedraw = 0;
 
 function render() {
   const now = Date.now();
-  const displayPrice = getDisplayPrice(now);
 
   // Draw chart once on load, then redraw every 60 seconds with a new candle
   if (!chartDrawn) {
@@ -800,7 +801,6 @@ function render() {
     chartDrawn = true;
     lastChartRedraw = now;
   } else if (now - lastChartRedraw > 60000) {
-    // Add a new candle - always green
     const last = candles[candles.length - 1];
     const rng = mulberry32(Math.floor(now / 1000));
     const newClose = last.close * (1 + rng() * 0.003 + 0.0005);
@@ -813,7 +813,6 @@ function render() {
       vol: 500 + rng() * 2000
     });
     if (candles.length > 60) candles.shift();
-    // Recalculate fixed scale for new data
     fixedMinP = null;
     fixedMaxP = null;
     resizeCanvas();
@@ -821,28 +820,21 @@ function render() {
     lastChartRedraw = now;
   }
 
-  updateStats(displayPrice);
-
-  // Throttle orderbook to every 2 seconds
-  if (now - lastObUpdate > 2000) {
-    updateOrderBook(displayPrice);
-    lastObUpdate = now;
+  // All displays update together on the same tick
+  if (now - lastDisplayUpdate > nextDisplayDelay) {
+    displayedPrice = getDisplayPrice(now);
+    updateStats(displayedPrice);
+    updateOrderBook(displayedPrice);
+    addTrade(displayedPrice);
+    lastDisplayUpdate = now;
+    nextDisplayDelay = 400 + Math.random() * 800;
   }
 
   requestAnimationFrame(render);
 }
 
-// Add trades at random-ish intervals
-function tradeTick() {
-  const price = getDisplayPrice(Date.now());
-  addTrade(price);
-  const next = 800 + Math.random() * 3000;
-  setTimeout(tradeTick, next);
-}
-
 window.addEventListener('load', () => {
   init();
-  tradeTick();
 });
 window.addEventListener('resize', () => {
   resizeCanvas();
