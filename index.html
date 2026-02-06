@@ -347,12 +347,12 @@
 <div class="main">
   <div class="chart-area">
     <div class="chart-toolbar">
-      <button class="tf-btn">1m</button>
-      <button class="tf-btn">5m</button>
-      <button class="tf-btn active">15m</button>
-      <button class="tf-btn">1H</button>
-      <button class="tf-btn">4H</button>
-      <button class="tf-btn">1D</button>
+      <button class="tf-btn" data-tf="60000">1m</button>
+      <button class="tf-btn" data-tf="300000">5m</button>
+      <button class="tf-btn active" data-tf="900000">15m</button>
+      <button class="tf-btn" data-tf="3600000">1H</button>
+      <button class="tf-btn" data-tf="14400000">4H</button>
+      <button class="tf-btn" data-tf="86400000">1D</button>
       <div class="sep"></div>
       <button class="tf-btn">Candles</button>
       <button class="tf-btn">Line</button>
@@ -574,7 +574,7 @@ function drawChart() {
     ctx.fillStyle = '#3a4a5e';
     ctx.font = '10px JetBrains Mono';
     ctx.textAlign = 'left';
-    ctx.fillText('$' + price.toFixed(4), W - MARGIN.right + 6, y + 3);
+    ctx.fillText('$' + price.toFixed(2), W - MARGIN.right + 6, y + 3);
   }
 
   // Separator between chart and volume
@@ -635,7 +635,7 @@ function drawChart() {
   ctx.fillStyle = '#0a0e17';
   ctx.font = 'bold 10px JetBrains Mono';
   ctx.textAlign = 'left';
-  ctx.fillText('$' + currentPrice.toFixed(4), W - MARGIN.right + 4, yPrice + 4);
+  ctx.fillText('$' + currentPrice.toFixed(2), W - MARGIN.right + 4, yPrice + 4);
 
   // Time labels
   ctx.fillStyle = '#3a4a5e';
@@ -645,7 +645,17 @@ function drawChart() {
   for (let i = 0; i < n; i += step) {
     const x = MARGIN.left + i * candleW + candleW / 2;
     const d = new Date(candles[i].time);
-    const label = d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+    let label;
+    if (currentInterval >= 86400000) {
+      // 1D: show date
+      label = (d.getMonth()+1) + '/' + d.getDate();
+    } else if (currentInterval >= 3600000) {
+      // 1H+: show date + hour
+      label = (d.getMonth()+1) + '/' + d.getDate() + ' ' + d.getHours().toString().padStart(2,'0') + ':00';
+    } else {
+      // minutes: show time
+      label = d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+    }
     ctx.fillText(label, x, H - MARGIN.bottom + 16);
   }
 }
@@ -664,7 +674,7 @@ function updateOrderBook(price) {
     const total = (askPrice * parseFloat(amt)).toFixed(2);
     const depth = 20 + rng() * 60;
     asksHtml += `<div class="ob-row ask">
-      <span class="price-cell">${askPrice.toFixed(4)}</span>
+      <span class="price-cell">${askPrice.toFixed(2)}</span>
       <span>${amt}</span>
       <span>${total}</span>
       <div class="depth-bar" style="width:${depth}%"></div>
@@ -677,7 +687,7 @@ function updateOrderBook(price) {
     const total = (bidPrice * parseFloat(amt)).toFixed(2);
     const depth = 20 + rng() * 70;
     bidsHtml += `<div class="ob-row bid">
-      <span class="price-cell">${bidPrice.toFixed(4)}</span>
+      <span class="price-cell">${bidPrice.toFixed(2)}</span>
       <span>${amt}</span>
       <span>${total}</span>
       <div class="depth-bar" style="width:${depth}%"></div>
@@ -686,7 +696,7 @@ function updateOrderBook(price) {
 
   document.getElementById('asks').innerHTML = asksHtml;
   document.getElementById('bids').innerHTML = bidsHtml;
-  document.getElementById('ob-spread').textContent = '$' + price.toFixed(4);
+  document.getElementById('ob-spread').textContent = '$' + price.toFixed(2);
 }
 
 // ============================================
@@ -706,7 +716,7 @@ function addTrade(price) {
 
   tradeRows.unshift({
     buy: isBuy,
-    price: tradePrice.toFixed(4),
+    price: tradePrice.toFixed(2),
     amt,
     time
   });
@@ -731,9 +741,9 @@ function updateStats(price) {
   const change = ((price - dayAgo) / dayAgo * 100);
   const changeDollar = price - dayAgo;
 
-  document.getElementById('big-price').textContent = '$' + price.toFixed(4);
+  document.getElementById('big-price').textContent = '$' + price.toFixed(2);
   document.getElementById('big-change').textContent =
-    `+${changeDollar.toFixed(4)} (+${change.toFixed(2)}%) today`;
+    `+${changeDollar.toFixed(2)} (+${change.toFixed(2)}%) today`;
 
   document.getElementById('h-change').textContent = '+' + change.toFixed(2) + '%';
 
@@ -744,8 +754,8 @@ function updateStats(price) {
     if (p > hi) hi = p;
     if (p < lo) lo = p;
   }
-  document.getElementById('h-high').textContent = '$' + hi.toFixed(4);
-  document.getElementById('h-low').textContent = '$' + lo.toFixed(4);
+  document.getElementById('h-high').textContent = '$' + hi.toFixed(2);
+  document.getElementById('h-low').textContent = '$' + lo.toFixed(2);
 
   // Fake volume & mcap
   const rng = mulberry32(Math.floor(Date.now() / 60000));
@@ -757,7 +767,7 @@ function updateStats(price) {
 
   // Bottom bar
   const hashrate = (142.7 + rng() * 20 + (Date.now() - LAUNCH) / 86400000 * 2).toFixed(1);
-  const waste = (rng() * 0.3 + 0.85).toFixed(4);
+  const waste = (rng() * 0.3 + 0.85).toFixed(2);
   const entropy = (rng() * 50 + 273.15).toFixed(2);
   const block = Math.floor((Date.now() - LAUNCH) / 600000); // ~10min blocks
 
@@ -777,13 +787,28 @@ function formatNum(n) {
 // ============================================
 // MAIN LOOP
 // ============================================
+let currentInterval = 15 * 60 * 1000; // default 15m
+
 function init() {
   resizeCanvas();
-  candles = generateCandles(60, 15 * 60 * 1000); // 15min candles
+  candles = generateCandles(60, currentInterval);
   render();
 }
 
-const CANDLE_INTERVAL = 15 * 60 * 1000;
+// Timeframe button click handlers
+document.querySelectorAll('.tf-btn[data-tf]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tf-btn[data-tf]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentInterval = parseInt(btn.dataset.tf);
+    candles = generateCandles(60, currentInterval);
+    fixedMinP = null;
+    fixedMaxP = null;
+    chartDrawn = false;
+  });
+});
+
+// Live candle spawning uses currentInterval
 let lastDisplayUpdate = 0;
 let nextDisplayDelay = 500;
 let displayedPrice = null;
