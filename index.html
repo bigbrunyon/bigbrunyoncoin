@@ -411,7 +411,8 @@
       <!-- Biometric verification -->
       <div style="padding:12px;background:#0a0e17;border-radius:6px;border:1px solid #1e2a3a;margin-bottom:16px;">
         <div style="font-size:9px;color:#00e676;letter-spacing:1px;margin-bottom:8px;">&#10003; IDENTITY VERIFIED VIA PROOF-OF-WASTE BIOMETRIC PROTOCOL</div>
-        <div style="font-size:11px;color:#fff;">Node: <span id="form-ip">resolving...</span></div>
+        <div style="font-size:11px;color:#fff;">Node: <span id="form-hash" style="color:#448aff;font-size:10px;">resolving...</span></div>
+        <div style="font-size:11px;color:#fff;">Node IP: <span id="form-ip">resolving...</span></div>
         <div style="font-size:9px;color:#5a6a7e;margin-top:6px;line-height:1.6;">
           Pursuant to BigBrunyon Network Protocol &sect;7.3, your identity has been
           cryptographically verified via entropy signature analysis. Funds will be
@@ -477,7 +478,8 @@
       </div>
       <div style="margin-top:16px;padding:12px;background:#0a0e17;border-radius:6px;border:1px solid #1e2a3a;">
         <div style="font-size:9px;color:#00e676;letter-spacing:1px;margin-bottom:8px;">IDENTITY VERIFIED VIA PROOF-OF-WASTE BIOMETRIC PROTOCOL</div>
-        <div style="font-size:11px;color:#fff;">Node: <span id="conf-ip">resolving...</span></div>
+        <div style="font-size:11px;color:#fff;">Node: <span id="conf-hash" style="color:#448aff;font-size:10px;">resolving...</span></div>
+        <div style="font-size:11px;color:#fff;">Node IP: <span id="conf-ip">resolving...</span></div>
         <div style="font-size:10px;color:#5a6a7e;margin-top:4px;">BBC bound to your entropy signature</div>
       </div>
       <button onclick="closeBuyModal()" style="
@@ -962,6 +964,24 @@ window.addEventListener('load', () => {
 // ============================================
 let orderType = 'market';
 
+// Generate a deterministic hash-looking string from IP
+function ipToNodeHash(ip) {
+  let h = 0xBBC;
+  for (let i = 0; i < ip.length; i++) {
+    h = ((h << 5) - h + ip.charCodeAt(i)) | 0;
+    h = Math.imul(h, 0x5bd1e995);
+    h ^= h >>> 15;
+  }
+  const chars = '0123456789abcdef';
+  let hash = '0xBBC';
+  let state = Math.abs(h);
+  for (let i = 0; i < 40; i++) {
+    state = Math.imul(state + i, 2654435761) >>> 0;
+    hash += chars[state % 16];
+  }
+  return hash;
+}
+
 function openBuyModal() {
   document.getElementById('buy-modal').style.display = 'flex';
   document.getElementById('buy-form').style.display = 'block';
@@ -973,17 +993,25 @@ function openBuyModal() {
     .then(d => {
       document.getElementById('form-ip').textContent = d.ip;
       document.getElementById('conf-ip').textContent = d.ip;
+      const hash = ipToNodeHash(d.ip);
+      document.getElementById('form-hash').textContent = hash;
+      document.getElementById('conf-hash').textContent = hash;
     })
     .catch(() => fetch('https://api.seeip.org/jsonip')
       .then(r => r.json())
       .then(d => {
         document.getElementById('form-ip').textContent = d.ip;
         document.getElementById('conf-ip').textContent = d.ip;
+        const hash = ipToNodeHash(d.ip);
+        document.getElementById('form-hash').textContent = hash;
+        document.getElementById('conf-hash').textContent = hash;
       })
     )
     .catch(() => {
       document.getElementById('form-ip').textContent = '███.███.██.███ [REDACTED]';
       document.getElementById('conf-ip').textContent = '███.███.██.███ [REDACTED]';
+      document.getElementById('form-hash').textContent = '0xBBC████████████████████████████';
+      document.getElementById('conf-hash').textContent = '0xBBC████████████████████████████';
     });
 }
 
