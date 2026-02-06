@@ -94,7 +94,7 @@
   .main {
     display: grid;
     grid-template-columns: 1fr 280px;
-    height: calc(100vh - 48px);
+    height: calc(100vh - 48px - 28px);
   }
 
   /* CHART AREA */
@@ -415,12 +415,10 @@ function getPrice(timestamp) {
   const days = ms / 86400000;
   const hours = ms / 3600000;
 
-  // Compound growth: ~3-5% per day with micro-fluctuations
-  // Main trend: exponential
+  // Compound growth: ~3-5% per day
   const trend = BASE_PRICE * Math.pow(1.038, days);
 
-  // Add deterministic "organic" noise so it looks like real trading
-  // Multiple sine waves at irrational-ish frequencies
+  // Slow organic noise for candle shapes
   const noise1 = Math.sin(hours * 0.7123) * 0.008;
   const noise2 = Math.sin(hours * 1.3917) * 0.005;
   const noise3 = Math.sin(hours * 3.7291) * 0.003;
@@ -428,6 +426,16 @@ function getPrice(timestamp) {
   const wobble = 1 + noise1 + noise2 + noise3 + noise4;
 
   return trend * wobble;
+}
+
+// Display price adds fast ticks for the live number readout only
+function getDisplayPrice(timestamp) {
+  const base = getPrice(timestamp);
+  const seconds = (timestamp - LAUNCH) / 1000;
+  const tick1 = Math.sin(seconds * 0.47) * 0.0015;
+  const tick2 = Math.sin(seconds * 1.13) * 0.001;
+  const tick3 = Math.sin(seconds * 2.71) * 0.0008;
+  return base * (1 + tick1 + tick2 + tick3);
 }
 
 // Seeded PRNG for deterministic fake data
@@ -481,35 +489,51 @@ const ctx = canvas.getContext('2d');
 let candles = [];
 
 function resizeCanvas() {
-  canvas.width = canvas.parentElement.clientWidth * window.devicePixelRatio;
-  canvas.height = canvas.parentElement.clientHeight * window.devicePixelRatio;
-  canvas.style.width = canvas.parentElement.clientWidth + 'px';
-  canvas.style.height = canvas.parentElement.clientHeight + 'px';
-  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.parentElement.clientWidth;
+  const h = canvas.parentElement.clientHeight;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
+
+let fixedMinP = null;
+let fixedMaxP = null;
 
 function drawChart() {
   const W = canvas.parentElement.clientWidth;
   const H = canvas.parentElement.clientHeight;
   const MARGIN = { top: 10, right: 70, bottom: 50, left: 10 };
   const chartW = W - MARGIN.left - MARGIN.right;
-  const chartH = H - MARGIN.top - MARGIN.bottom - 60; // leave room for volume
-  const volH = 50;
+  const chartH = H - MARGIN.top - MARGIN.bottom - 80;
+  const volH = 60;
   const volY = H - MARGIN.bottom - volH;
 
   ctx.clearRect(0, 0, W, H);
 
   if (candles.length === 0) return;
 
-  // Price range
-  let minP = Infinity, maxP = -Infinity, maxVol = 0;
-  candles.forEach(c => {
-    if (c.low < minP) minP = c.low;
-    if (c.high > maxP) maxP = c.high;
-    if (c.vol > maxVol) maxVol = c.vol;
-  });
-  const pad = (maxP - minP) * 0.1;
-  minP -= pad; maxP += pad;
+  let maxVol = 0;
+  candles.forEach(c => { if (c.vol > maxVol) maxVol = c.vol; });
+
+  // Set scale ONCE, then never change it until page reload
+  if (fixedMinP === null) {
+    let rawMin = Infinity, rawMax = -Infinity;
+    candles.forEach(c => {
+      if (c.low < rawMin) rawMin = c.low;
+      if (c.high > rawMax) rawMax = c.high;
+    });
+    // Big window: 10% below lowest, 10% above highest
+    // Plus extra room at top for future growth
+    const range = rawMax - rawMin;
+    fixedMinP = rawMin - range * 0.3;
+    fixedMaxP = rawMax + range * 0.5; // room for a few minutes of growth
+  }
+
+  let minP = fixedMinP;
+  let maxP = fixedMaxP;
 
   const n = candles.length;
   const candleW = chartW / n;
@@ -533,6 +557,14 @@ function drawChart() {
     ctx.textAlign = 'left';
     ctx.fillText('$' + price.toFixed(4), W - MARGIN.right + 6, y + 3);
   }
+
+  // Separator between chart and volume
+  ctx.strokeStyle = '#1a2235';
+  ctx.lineWidth = 0.5;
+  ctx.beginPath();
+  ctx.moveTo(MARGIN.left, volY);
+  ctx.lineTo(W - MARGIN.right, volY);
+  ctx.stroke();
 
   // Candles
   candles.forEach((c, i) => {
@@ -728,32 +760,40 @@ function formatNum(n) {
 // ============================================
 function init() {
   resizeCanvas();
-  candles = generateCandles(80, 15 * 60 * 1000); // 15min candles
+  candles = generateCandles(60, 15 * 60 * 1000); // 15min candles
   render();
 }
 
-function render() {
-  const price = getPrice(Date.now());
+const CANDLE_INTERVAL = 15 * 60 * 1000; // 15 min candles
+let lastObUpdate = 0;
 
-  // Update last candle
-  if (candles.length > 0) {
-    const last = candles[candles.length - 1];
-    last.close = price;
-    if (price > last.high) last.high = price;
-    if (price < last.low) last.low = price;
+let chartDrawn = false;
+
+function render() {
+  const now = Date.now();
+  const displayPrice = getDisplayPrice(now);
+
+  // Draw chart exactly ONCE, then never touch it again
+  if (!chartDrawn) {
+    resizeCanvas();
+    drawChart();
+    chartDrawn = true;
   }
 
-  resizeCanvas();
-  drawChart();
-  updateOrderBook(price);
-  updateStats(price);
+  updateStats(displayPrice);
+
+  // Throttle orderbook to every 2 seconds
+  if (now - lastObUpdate > 2000) {
+    updateOrderBook(displayPrice);
+    lastObUpdate = now;
+  }
 
   requestAnimationFrame(render);
 }
 
 // Add trades at random-ish intervals
 function tradeTick() {
-  const price = getPrice(Date.now());
+  const price = getDisplayPrice(Date.now());
   addTrade(price);
   const next = 800 + Math.random() * 3000;
   setTimeout(tradeTick, next);
@@ -763,7 +803,10 @@ window.addEventListener('load', () => {
   init();
   tradeTick();
 });
-window.addEventListener('resize', resizeCanvas);
+window.addEventListener('resize', () => {
+  resizeCanvas();
+  chartDrawn = false; // redraw on resize only
+});
 </script>
 </body>
 </html>
