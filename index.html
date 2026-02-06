@@ -594,6 +594,18 @@ function generateCandles(count, intervalMs) {
     candles[i].low = Math.min(candles[i].open, candles[i].close) * (1 - rng() * 0.002);
   }
 
+  // Scale all candles so the last close matches the real price
+  // This keeps the price consistent across all timeframes
+  const targetPrice = getPrice(now);
+  const actualLast = candles[candles.length - 1].close;
+  const scale = targetPrice / actualLast;
+  candles.forEach(c => {
+    c.open *= scale;
+    c.close *= scale;
+    c.high *= scale;
+    c.low *= scale;
+  });
+
   return candles;
 }
 
