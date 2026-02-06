@@ -459,27 +459,44 @@ function generateCandles(count, intervalMs) {
   for (let i = count - 1; i >= 0; i--) {
     const t0 = now - i * intervalMs;
     const t1 = t0 + intervalMs;
-    const samples = 20;
+    const rng = mulberry32(Math.floor(t0 / 1000));
+
     let open = getPrice(t0);
     let close = getPrice(t1);
-    let high = Math.max(open, close);
-    let low = Math.min(open, close);
 
-    for (let s = 0; s < samples; s++) {
-      const p = getPrice(t0 + (intervalMs * s / samples));
-      if (p > high) high = p;
-      if (p < low) low = p;
+    // Rig it: 85% green candles. Red candles are tiny dips.
+    const isGreen = rng() < 0.85;
+    if (isGreen) {
+      // Force close above open
+      if (close <= open) close = open * (1 + rng() * 0.003 + 0.0005);
+    } else {
+      // Small red candle -- never drops more than 0.15%
+      close = open * (1 - rng() * 0.0015);
     }
 
-    // Add a little wick beyond the body
-    const rng = mulberry32(Math.floor(t0 / 1000));
-    high *= (1 + rng() * 0.004);
-    low *= (1 - rng() * 0.003);
+    let high = Math.max(open, close) * (1 + rng() * 0.003);
+    let low = Math.min(open, close) * (1 - rng() * 0.002);
 
     const vol = (500 + rng() * 2000) * (1 + (count - i) * 0.01);
 
     candles.push({ time: t0, open, high, low, close, vol });
   }
+
+  // Enforce overall upward trend: each candle's open = previous close
+  for (let i = 1; i < candles.length; i++) {
+    candles[i].open = candles[i - 1].close;
+    // Recalculate close relative to new open
+    const rng = mulberry32(Math.floor(candles[i].time / 1000) + 999);
+    const isGreen = rng() < 0.85;
+    if (isGreen) {
+      candles[i].close = candles[i].open * (1 + rng() * 0.003 + 0.0005);
+    } else {
+      candles[i].close = candles[i].open * (1 - rng() * 0.0015);
+    }
+    candles[i].high = Math.max(candles[i].open, candles[i].close) * (1 + rng() * 0.003);
+    candles[i].low = Math.min(candles[i].open, candles[i].close) * (1 - rng() * 0.002);
+  }
+
   return candles;
 }
 
@@ -783,16 +800,16 @@ function render() {
     chartDrawn = true;
     lastChartRedraw = now;
   } else if (now - lastChartRedraw > 60000) {
-    // Add a new candle
+    // Add a new candle - always green
     const last = candles[candles.length - 1];
-    const newPrice = getPrice(now);
     const rng = mulberry32(Math.floor(now / 1000));
+    const newClose = last.close * (1 + rng() * 0.003 + 0.0005);
     candles.push({
       time: now,
       open: last.close,
-      high: Math.max(last.close, newPrice) * (1 + rng() * 0.002),
-      low: Math.min(last.close, newPrice) * (1 - rng() * 0.001),
-      close: newPrice,
+      high: newClose * (1 + rng() * 0.003),
+      low: last.close * (1 - rng() * 0.001),
+      close: newClose,
       vol: 500 + rng() * 2000
     });
     if (candles.length > 60) candles.shift();
